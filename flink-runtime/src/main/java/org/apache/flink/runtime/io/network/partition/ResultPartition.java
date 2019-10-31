@@ -99,7 +99,6 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 
 	private final FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory;
 
-	@Nullable
 	private final BufferPersister bufferPersister;
 
 	public ResultPartition(
@@ -118,7 +117,7 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		this.numTargetKeyGroups = numTargetKeyGroups;
 		this.partitionManager = checkNotNull(partitionManager);
 		this.bufferPoolFactory = bufferPoolFactory;
-		this.bufferPersister = null;
+		this.bufferPersister = new NoopBufferPersister();
 	}
 
 	/**
@@ -212,20 +211,16 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		for (ResultSubpartition subpartition : subpartitions) {
 			subpartition.flush();
 		}
-		if (bufferPersister != null) {
-			// TODO: this is a trade off: trigger flush notification and having less data to persist
-			// during the checkpoint at a cost of the flush notification. Probably the cost of
-			// flush notification is minuscule compared to the cost of writing the data...
-			bufferPersister.flushAll();
-		}
+		// TODO: this is a trade off: trigger flush notification and having less data to persist
+		// during the checkpoint at a cost of the flush notification. Probably the cost of
+		// flush notification is minuscule compared to the cost of writing the data...
+		bufferPersister.flushAll();
 	}
 
 	@Override
 	public void flush(int subpartitionIndex) {
 		subpartitions[subpartitionIndex].flush();
-		if (bufferPersister != null) {
-			bufferPersister.flush(subpartitionIndex);
-		}
+		bufferPersister.flush(subpartitionIndex);
 	}
 
 	/**
