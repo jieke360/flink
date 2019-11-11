@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.runtime.io.network.api.serialization.RecordSerializer.SerializationResult;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -315,5 +316,9 @@ public abstract class RecordWriter<T extends IOReadableWritable> {
 				notifyFlusherException(t);
 			}
 		}
+	}
+
+	public CompletableFuture<?> persist() {
+		return targetPartition.persist();
 	}
 }

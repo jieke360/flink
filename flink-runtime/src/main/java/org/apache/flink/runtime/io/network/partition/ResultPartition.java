@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -108,7 +109,8 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		ResultSubpartition[] subpartitions,
 		int numTargetKeyGroups,
 		ResultPartitionManager partitionManager,
-		FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory) {
+		FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory,
+		BufferPersister bufferPersister) {
 
 		this.owningTaskName = checkNotNull(owningTaskName);
 		this.partitionId = checkNotNull(partitionId);
@@ -117,7 +119,7 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		this.numTargetKeyGroups = numTargetKeyGroups;
 		this.partitionManager = checkNotNull(partitionManager);
 		this.bufferPoolFactory = bufferPoolFactory;
-		this.bufferPersister = new NoopBufferPersister();
+		this.bufferPersister = bufferPersister;
 	}
 
 	/**
@@ -195,7 +197,7 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 			subpartition = subpartitions[subpartitionIndex];
 
 			if (bufferPersister != null) {
-				bufferPersister.add(bufferConsumer.copy(), subpartitionIndex);
+				bufferPersister.add(bufferConsumer, subpartitionIndex);
 			}
 		}
 		catch (Exception ex) {
@@ -239,6 +241,11 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		}
 
 		isFinished = true;
+	}
+
+	@Override
+	public CompletableFuture<?> persist() {
+		return bufferPersister.persist();
 	}
 
 	public void release() {

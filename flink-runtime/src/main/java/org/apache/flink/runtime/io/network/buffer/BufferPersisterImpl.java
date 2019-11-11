@@ -66,7 +66,7 @@ public class BufferPersisterImpl implements BufferPersister {
 	}
 
 	@Override
-	public synchronized CompletableFuture<?> persist() {
+	public CompletableFuture<?> persist() {
 		flushAll();
 		return writer.persist();
 	}

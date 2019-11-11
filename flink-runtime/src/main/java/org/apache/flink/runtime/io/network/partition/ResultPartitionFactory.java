@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
+import org.apache.flink.runtime.io.network.buffer.BufferPersister;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolFactory;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolOwner;
@@ -81,14 +82,16 @@ public class ResultPartitionFactory {
 
 	public ResultPartition create(
 			String taskNameWithSubtaskAndId,
-			ResultPartitionDeploymentDescriptor desc) {
+			ResultPartitionDeploymentDescriptor desc,
+			BufferPersister bufferPersister) {
 		return create(
 			taskNameWithSubtaskAndId,
 			desc.getShuffleDescriptor().getResultPartitionID(),
 			desc.getPartitionType(),
 			desc.getNumberOfSubpartitions(),
 			desc.getMaxParallelism(),
-			createBufferPoolFactory(desc.getNumberOfSubpartitions(), desc.getPartitionType()));
+			createBufferPoolFactory(desc.getNumberOfSubpartitions(), desc.getPartitionType()),
+			bufferPersister);
 	}
 
 	@VisibleForTesting
@@ -98,7 +101,8 @@ public class ResultPartitionFactory {
 			ResultPartitionType type,
 			int numberOfSubpartitions,
 			int maxParallelism,
-			FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory) {
+			FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory,
+			BufferPersister bufferPersister) {
 		ResultSubpartition[] subpartitions = new ResultSubpartition[numberOfSubpartitions];
 
 		ResultPartition partition = forcePartitionReleaseOnConsumption || !type.isBlocking()
@@ -109,7 +113,8 @@ public class ResultPartitionFactory {
 				subpartitions,
 				maxParallelism,
 				partitionManager,
-				bufferPoolFactory)
+				bufferPoolFactory,
+				bufferPersister)
 			: new ResultPartition(
 				taskNameWithSubtaskAndId,
 				id,
@@ -117,7 +122,8 @@ public class ResultPartitionFactory {
 				subpartitions,
 				maxParallelism,
 				partitionManager,
-				bufferPoolFactory);
+				bufferPoolFactory,
+				bufferPersister);
 
 		createSubpartitions(partition, type, blockingSubpartitionType, subpartitions);
 

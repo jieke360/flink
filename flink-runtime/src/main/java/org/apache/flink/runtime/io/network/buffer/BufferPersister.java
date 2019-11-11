@@ -17,6 +17,8 @@
 
 package org.apache.flink.runtime.io.network.buffer;
 
+import org.apache.flink.configuration.ConfigOption;
+
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
@@ -26,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public interface BufferPersister extends AutoCloseable {
 	void add(BufferConsumer bufferConsumer, int channelId);
 
-	CompletableFuture<?> persist() throws IOException;
+	CompletableFuture<?> persist();
 
 	@Override
 	void close() throws IOException, InterruptedException;

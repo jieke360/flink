@@ -41,6 +41,7 @@ import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.TestingHighAvailabilityServices;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironmentBuilder;
+import org.apache.flink.runtime.io.network.buffer.BufferPersister;
 import org.apache.flink.runtime.io.network.partition.PartitionProducerStateProvider;
 import org.apache.flink.runtime.io.network.partition.PartitionTestUtils;
 import org.apache.flink.runtime.io.network.partition.ResultPartition;
@@ -474,8 +475,12 @@ public class TaskExecutorPartitionLifecycleTest extends TestLogger {
 		}
 
 		@Override
-		public Collection<ResultPartition> createResultPartitionWriters(ShuffleIOOwnerContext ownerContext, Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors) {
-			return backingShuffleEnvironment.createResultPartitionWriters(ownerContext, resultPartitionDeploymentDescriptors);
+		public Collection<ResultPartition> createResultPartitionWriters(
+			ShuffleIOOwnerContext ownerContext,
+			Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
+			final BufferPersister bufferPersister) {
+			return backingShuffleEnvironment.createResultPartitionWriters(ownerContext, resultPartitionDeploymentDescriptors,
+				bufferPersister);
 		}
 
 		@Override

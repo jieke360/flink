@@ -85,6 +85,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -946,12 +947,16 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				checkpointMetaData.getCheckpointId(),
 				checkpointOptions.getTargetLocation());
 
+		final CompletableFuture<Void> persistFuture = CompletableFuture.allOf(
+			recordWriters.stream().map(RecordWriter::persist).toArray(CompletableFuture[]::new));
+
 		CheckpointingOperation checkpointingOperation = new CheckpointingOperation(
 			this,
 			checkpointMetaData,
 			checkpointOptions,
 			storage,
-			checkpointMetrics);
+			checkpointMetrics,
+			persistFuture);
 
 		checkpointingOperation.executeCheckpointing();
 	}
@@ -1066,19 +1071,22 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		private final AtomicReference<CheckpointingOperation.AsyncCheckpointState> asyncCheckpointState = new AtomicReference<>(
 			CheckpointingOperation.AsyncCheckpointState.RUNNING);
+		private final CompletableFuture<Void> persistFuture;
 
 		AsyncCheckpointRunnable(
 			StreamTask<?, ?> owner,
 			Map<OperatorID, OperatorSnapshotFutures> operatorSnapshotsInProgress,
 			CheckpointMetaData checkpointMetaData,
 			CheckpointMetrics checkpointMetrics,
-			long asyncStartNanos) {
+			long asyncStartNanos,
+			CompletableFuture<Void> persistFuture) {
 
 			this.owner = Preconditions.checkNotNull(owner);
 			this.operatorSnapshotsInProgress = Preconditions.checkNotNull(operatorSnapshotsInProgress);
 			this.checkpointMetaData = Preconditions.checkNotNull(checkpointMetaData);
 			this.checkpointMetrics = Preconditions.checkNotNull(checkpointMetrics);
 			this.asyncStartNanos = asyncStartNanos;
+			this.persistFuture = persistFuture;
 		}
 
 		@Override
@@ -1117,6 +1125,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 				if (asyncCheckpointState.compareAndSet(CheckpointingOperation.AsyncCheckpointState.RUNNING,
 					CheckpointingOperation.AsyncCheckpointState.COMPLETED)) {
+
+					persistFuture.join();
 
 					reportCompletedSnapshotStates(
 						jobManagerTaskOperatorSubtaskStates,
@@ -1278,6 +1288,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		private final CheckpointOptions checkpointOptions;
 		private final CheckpointMetrics checkpointMetrics;
 		private final CheckpointStreamFactory storageLocation;
+		private final CompletableFuture<Void> persistFuture;
 
 		private final StreamOperator<?>[] allOperators;
 
@@ -1289,11 +1300,12 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		private final Map<OperatorID, OperatorSnapshotFutures> operatorSnapshotsInProgress;
 
 		public CheckpointingOperation(
-				StreamTask<?, ?> owner,
-				CheckpointMetaData checkpointMetaData,
-				CheckpointOptions checkpointOptions,
-				CheckpointStreamFactory checkpointStorageLocation,
-				CheckpointMetrics checkpointMetrics) {
+			StreamTask<?, ?> owner,
+			CheckpointMetaData checkpointMetaData,
+			CheckpointOptions checkpointOptions,
+			CheckpointStreamFactory checkpointStorageLocation,
+			CheckpointMetrics checkpointMetrics,
+			final CompletableFuture<Void> persistFuture) {
 
 			this.owner = Preconditions.checkNotNull(owner);
 			this.checkpointMetaData = Preconditions.checkNotNull(checkpointMetaData);
@@ -1302,6 +1314,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			this.storageLocation = Preconditions.checkNotNull(checkpointStorageLocation);
 			this.allOperators = owner.operatorChain.getAllOperators();
 			this.operatorSnapshotsInProgress = new HashMap<>(allOperators.length);
+			this.persistFuture = persistFuture;
 		}
 
 		public void executeCheckpointing() throws Exception {
@@ -1327,7 +1340,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 					operatorSnapshotsInProgress,
 					checkpointMetaData,
 					checkpointMetrics,
-					startAsyncPartNano);
+					startAsyncPartNano,
+					persistFuture);
 
 				owner.cancelables.registerCloseable(asyncCheckpointRunnable);
 				owner.asyncOperationsThreadPool.execute(asyncCheckpointRunnable);
