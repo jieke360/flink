@@ -21,6 +21,7 @@ package org.apache.flink.api.java.io.jdbc;
 import org.apache.flink.api.common.io.RichOutputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,26 +44,19 @@ public abstract class AbstractJDBCOutputFormat<T> extends RichOutputFormat<T> {
 	static final long DEFAULT_FLUSH_INTERVAL_MILLS = 0;
 
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractJDBCOutputFormat.class);
-
-	private final JdbcConnectionOptions options;
-
 	protected transient Connection connection;
+	private final JdbcConnectionProvider connectionProvider;
 
-	public AbstractJDBCOutputFormat(JdbcConnectionOptions options) {
-		this.options = options;
+	protected AbstractJDBCOutputFormat(JdbcConnectionProvider connectionProvider) {
+		this.connectionProvider = Preconditions.checkNotNull(connectionProvider);
 	}
 
 	@Override
 	public void configure(Configuration parameters) {
 	}
 
-	protected void establishConnection() throws SQLException, ClassNotFoundException {
-		Class.forName(options.getDriverName());
-		if (options.username == null) {
-			connection = DriverManager.getConnection(options.url);
-		} else {
-			connection = DriverManager.getConnection(options.url, options.username, options.password);
-		}
+	protected void establishConnection() throws Exception {
+		connection = connectionProvider.getConnection();
 	}
 
 	protected void closeDbConnection() throws IOException {

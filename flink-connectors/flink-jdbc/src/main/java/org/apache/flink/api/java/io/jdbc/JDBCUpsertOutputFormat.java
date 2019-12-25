@@ -73,13 +73,13 @@ public class JDBCUpsertOutputFormat extends AbstractJDBCOutputFormat<Tuple2<Bool
 			long flushIntervalMills,
 			int maxRetryTimes) {
 		this(
-				options,
+				new SimpleJdbcConnectionProvider(options),
 				JdbcUpsertOptions.builder().withFieldNames(fieldNames).withKeyFields(keyFields).withFieldTypes(fieldTypes).withMaxRetries(maxRetryTimes).build(),
 				JdbcBatchOptions.builder().withSize(flushMaxSize).withIntervalMs(flushIntervalMills).build());
 	}
 
-	public JDBCUpsertOutputFormat(JdbcConnectionOptions connectionOptions, JdbcUpsertOptions upsertOptions, JdbcBatchOptions batchOptions) {
-		super(connectionOptions);
+	public JDBCUpsertOutputFormat(JdbcConnectionProvider connectionProvider, JdbcUpsertOptions upsertOptions, JdbcBatchOptions batchOptions) {
+		super(connectionProvider);
 		this.upsertOptions = upsertOptions;
 		this.batchOptions = batchOptions;
 	}
@@ -105,10 +105,8 @@ public class JDBCUpsertOutputFormat extends AbstractJDBCOutputFormat<Tuple2<Bool
 					getRuntimeContext().getExecutionConfig().isObjectReuseEnabled());
 			}
 			jdbcWriter.open(connection);
-		} catch (SQLException sqe) {
-			throw new IllegalArgumentException("open() failed.", sqe);
-		} catch (ClassNotFoundException cnfe) {
-			throw new IllegalArgumentException("JDBC driver class not found.", cnfe);
+		} catch (Exception e) {
+			throw new IOException(e);
 		}
 
 		if (batchOptions.getIntervalMs() != 0 && batchOptions.getSize() != 1) {
@@ -286,7 +284,7 @@ public class JDBCUpsertOutputFormat extends AbstractJDBCOutputFormat<Tuple2<Bool
 			checkNotNull(options, "No options supplied.");
 			checkNotNull(fieldNames, "No fieldNames supplied.");
 			return new JDBCUpsertOutputFormat(
-					options,
+					new SimpleJdbcConnectionProvider(options),
 					JdbcUpsertOptions.builder()
 							.withTableName(options.getTableName()).withDialect(options.getDialect().getName())
 							.withFieldNames(fieldNames).withKeyFields(keyFields).withFieldTypes(fieldTypes).withMaxRetries(maxRetryTimes).build(),

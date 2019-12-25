@@ -31,10 +31,10 @@ public final class FlinkJdbcFacade {
 	}
 
 	public static SinkFunction<Row> sink(JdbcConnectionOptions connectionOptions, JdbcInsertOptions insertOptions, JdbcBatchOptions batchOptions) {
-		return new JDBCSinkFunction(new JDBCOutputFormat(connectionOptions, insertOptions, batchOptions));
+		return new JDBCSinkFunction(new JDBCOutputFormat(new SimpleJdbcConnectionProvider(connectionOptions), insertOptions, batchOptions));
 	}
 
 	public static SinkFunction<Tuple2<Boolean, Row>> upsertSink(JdbcConnectionOptions connectionOptions, JdbcUpsertOptions updateOptions, JdbcBatchOptions jdbcBatchOptions) {
-		return new JDBCUpsertSinkFunction(new JDBCUpsertOutputFormat(connectionOptions, updateOptions, jdbcBatchOptions));
+		return new JDBCUpsertSinkFunction(new JDBCUpsertOutputFormat(new SimpleJdbcConnectionProvider(connectionOptions), updateOptions, jdbcBatchOptions));
 	}
 }

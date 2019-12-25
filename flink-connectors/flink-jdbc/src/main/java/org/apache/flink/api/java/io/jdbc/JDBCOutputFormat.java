@@ -56,13 +56,13 @@ public class JDBCOutputFormat extends AbstractJDBCOutputFormat<Row> {
 	 */
 	@Deprecated
 	public JDBCOutputFormat(String username, String password, String drivername, String dbURL, String query, int batchInterval, int[] typesArray) {
-		this(new JdbcConnectionOptions(dbURL, drivername, username, password),
+		this(new SimpleJdbcConnectionProvider(new JdbcConnectionOptions(dbURL, drivername, username, password)),
 				JdbcInsertOptions.builder().withFieldTypes(typesArray).withQuery(query).build(),
 				JdbcBatchOptions.builder().withSize(batchInterval).build());
 	}
 
-	public JDBCOutputFormat(JdbcConnectionOptions connectionOptions, JdbcInsertOptions insertOptions, JdbcBatchOptions batchOptions) {
-		super(connectionOptions);
+	public JDBCOutputFormat(JdbcConnectionProvider connectionProvider, JdbcInsertOptions insertOptions, JdbcBatchOptions batchOptions) {
+		super(connectionProvider);
 		this.insertOptions = insertOptions;
 		this.batchOptions = batchOptions;
 	}
@@ -79,10 +79,8 @@ public class JDBCOutputFormat extends AbstractJDBCOutputFormat<Row> {
 		try {
 			establishConnection();
 			upload = connection.prepareStatement(insertOptions.getQuery());
-		} catch (SQLException sqe) {
-			throw new IllegalArgumentException("open() failed.", sqe);
-		} catch (ClassNotFoundException cnfe) {
-			throw new IllegalArgumentException("JDBC driver class not found.", cnfe);
+		} catch (Exception e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -196,7 +194,8 @@ public class JDBCOutputFormat extends AbstractJDBCOutputFormat<Row> {
 		 * @return Configured JDBCOutputFormat
 		 */
 		public JDBCOutputFormat finish() {
-			return new JDBCOutputFormat(buildConnectionOptions(),
+			return new JDBCOutputFormat(
+					new SimpleJdbcConnectionProvider(buildConnectionOptions()),
 					JdbcInsertOptions.builder().withQuery(query).withFieldTypes(typesArray).build(),
 					JdbcBatchOptions.builder().withSize(batchInterval).build());
 		}
