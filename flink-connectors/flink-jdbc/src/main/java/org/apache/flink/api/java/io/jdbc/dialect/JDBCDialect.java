@@ -18,6 +18,8 @@
 
 package org.apache.flink.api.java.io.jdbc.dialect;
 
+import org.apache.flink.api.java.io.jdbc.dialect.JDBCDialects.JdbcDialectName;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Optional;
@@ -128,4 +130,6 @@ public interface JDBCDialect extends Serializable {
 		return "SELECT " + selectExpressions + " FROM " +
 				quoteIdentifier(tableName) + (conditionFields.length > 0 ? " WHERE " + fieldExpressions : "");
 	}
+
+	JdbcDialectName getName();
 }

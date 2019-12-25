@@ -28,6 +28,32 @@ import java.util.stream.Collectors;
  */
 public final class JDBCDialects {
 
+	/**
+	 * JdbcDialectName.
+	 */
+	public enum JdbcDialectName {
+		DERBY {
+			@Override
+			public JDBCDialect create() {
+				return new DerbyDialect();
+			}
+		},
+		MYSQL {
+			@Override
+			public JDBCDialect create() {
+				return new MySQLDialect();
+			}
+		},
+		POSTGRES {
+			@Override
+			public JDBCDialect create() {
+				return new PostgresDialect();
+			}
+		};
+
+		public abstract JDBCDialect create();
+	}
+
 	private static final List<JDBCDialect> DIALECTS = Arrays.asList(
 		new DerbyDialect(),
 		new MySQLDialect(),
@@ -63,6 +89,11 @@ public final class JDBCDialects {
 		@Override
 		public String quoteIdentifier(String identifier) {
 			return identifier;
+		}
+
+		@Override
+		public JdbcDialectName getName() {
+			return JdbcDialectName.DERBY;
 		}
 	}
 
@@ -101,6 +132,11 @@ public final class JDBCDialects {
 					" ON DUPLICATE KEY UPDATE " + updateClause
 			);
 		}
+
+		@Override
+		public JdbcDialectName getName() {
+			return JdbcDialectName.MYSQL;
+		}
 	}
 
 	private static class PostgresDialect implements JDBCDialect {
@@ -132,6 +168,11 @@ public final class JDBCDialects {
 							" ON CONFLICT (" + uniqueColumns + ")" +
 							" DO UPDATE SET " + updateClause
 			);
+		}
+
+		@Override
+		public JdbcDialectName getName() {
+			return JdbcDialectName.POSTGRES;
 		}
 	}
 }

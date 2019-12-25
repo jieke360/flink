@@ -95,7 +95,7 @@ public class JDBCAppendTableSink implements AppendStreamTableSink<Row>, BatchTab
 
 	@Override
 	public TableSink<Row> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
-		int[] types = outputFormat.getTypesArray();
+		int[] types = outputFormat.insertOptions.getFieldTypes();
 
 		String sinkSchema =
 			String.join(", ", IntStream.of(types).mapToObj(JDBCTypeUtil::getTypeName).collect(Collectors.toList()));
