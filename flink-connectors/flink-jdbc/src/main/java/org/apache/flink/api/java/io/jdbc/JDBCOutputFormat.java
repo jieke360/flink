@@ -101,7 +101,7 @@ public class JDBCOutputFormat extends AbstractJDBCOutputFormat<Row> {
 		}
 	}
 
-	void flush() {
+	public void flush() {
 		try {
 			upload.executeBatch();
 			batchCount = 0;

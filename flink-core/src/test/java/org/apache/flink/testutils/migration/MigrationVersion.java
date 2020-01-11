@@ -18,6 +18,12 @@
 
 package org.apache.flink.testutils.migration;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * Enumeration for Flink versions, used in migration integration tests
  * to indicate the migrated snapshot version.
@@ -48,5 +54,11 @@ public enum MigrationVersion {
 
 	public boolean isNewerVersionThan(MigrationVersion otherVersion) {
 		return Double.valueOf(versionStr) > Double.valueOf(otherVersion.versionStr);
+	}
+
+	private static final Map<String, MigrationVersion> CODE_MAP = Arrays.stream(values()).collect(Collectors.toMap(v -> v.versionStr, Function.identity()));
+
+	public static Optional<MigrationVersion> byCode(String code) {
+		return Optional.ofNullable(CODE_MAP.get(code));
 	}
 }

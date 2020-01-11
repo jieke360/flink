@@ -18,9 +18,17 @@
 package org.apache.flink.api.java.io.jdbc;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.java.io.jdbc.xa.JdbcXaSinkFunction;
+import org.apache.flink.api.java.io.jdbc.xa.XaFacade;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.types.Row;
+
+import javax.sql.XADataSource;
+
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * JDBC facade.
@@ -36,5 +44,19 @@ public final class FlinkJdbcFacade {
 
 	public static SinkFunction<Tuple2<Boolean, Row>> upsertSink(JdbcConnectionOptions connectionOptions, JdbcUpsertOptions updateOptions, JdbcBatchOptions jdbcBatchOptions) {
 		return new JDBCUpsertSinkFunction(new JDBCUpsertOutputFormat(new SimpleJdbcConnectionProvider(connectionOptions), updateOptions, jdbcBatchOptions));
+	}
+
+	public static <T> SinkFunction<T> exactlyOnceSink(
+			JdbcInsertOptions insertOptions,
+			JdbcBatchOptions batchOptions,
+			JdbcExactlyOnceOptions exactlyOnceOptions,
+			Supplier<XADataSource> dataSourceSupplier,
+			Function<T, Row> recordConverter) {
+		return new JdbcXaSinkFunction<>(
+				insertOptions,
+				batchOptions,
+				exactlyOnceOptions,
+				XaFacade.fromXaDataSourceSupplier(dataSourceSupplier, Optional.empty()),
+				recordConverter);
 	}
 }
