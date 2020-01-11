@@ -19,14 +19,11 @@
 package org.apache.flink.api.java.io.jdbc;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.java.io.jdbc.xa.h2.H2DbMetadata;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.rules.ExpectedException;
-
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -35,23 +32,21 @@ import java.sql.Statement;
 /**
  * Base test class for JDBC Input and Output formats.
  */
-public class JDBCTestBase {
+@SuppressWarnings("SpellCheckingInspection")
+public class JdbcTestFixture {
+	public static final JdbcTestCheckpoint CP0 = new JdbcTestCheckpoint(0, 1, 2, 3);
+	public static final JdbcTestCheckpoint CP1 = new JdbcTestCheckpoint(1, 4, 5, 6);
 
-	@Rule
-	public ExpectedException exception = ExpectedException.none();
-
-	public static final String DRIVER_CLASS = "org.apache.derby.jdbc.EmbeddedDriver";
-	public static final String DB_URL = "jdbc:derby:memory:ebookshop";
 	public static final String INPUT_TABLE = "books";
-	public static final String OUTPUT_TABLE = "newbooks";
-	public static final String OUTPUT_TABLE_2 = "newbooks2";
-	public static final String SELECT_ALL_BOOKS = "select * from " + INPUT_TABLE;
-	public static final String SELECT_ALL_NEWBOOKS = "select * from " + OUTPUT_TABLE;
-	public static final String SELECT_ALL_NEWBOOKS_2 = "select * from " + OUTPUT_TABLE_2;
-	public static final String SELECT_EMPTY = "select * from books WHERE QTY < 0";
+	static final String OUTPUT_TABLE = "newbooks";
+	static final String OUTPUT_TABLE_2 = "newbooks2";
+	static final String SELECT_ALL_BOOKS = "select * from " + INPUT_TABLE;
+	static final String SELECT_ALL_NEWBOOKS = "select * from " + OUTPUT_TABLE;
+	static final String SELECT_ALL_NEWBOOKS_2 = "select * from " + OUTPUT_TABLE_2;
+	static final String SELECT_EMPTY = "select * from books WHERE QTY < 0";
 	public static final String INSERT_TEMPLATE = "insert into %s (id, title, author, price, qty) values (?,?,?,?,?)";
-	public static final String SELECT_ALL_BOOKS_SPLIT_BY_ID = SELECT_ALL_BOOKS + " WHERE id BETWEEN ? AND ?";
-	public static final String SELECT_ALL_BOOKS_SPLIT_BY_AUTHOR = SELECT_ALL_BOOKS + " WHERE author = ?";
+	static final String SELECT_ALL_BOOKS_SPLIT_BY_ID = SELECT_ALL_BOOKS + " WHERE id BETWEEN ? AND ?";
+	static final String SELECT_ALL_BOOKS_SPLIT_BY_AUTHOR = SELECT_ALL_BOOKS + " WHERE author = ?";
 
 	public static final TestEntry[] TEST_DATA = {
 			new TestEntry(1001, ("Java public for dummies"), ("Tan Ah Teck"), 11.11, 11),
@@ -66,12 +61,19 @@ public class JDBCTestBase {
 			new TestEntry(1010, ("A Teaspoon of Java 1.8"), ("Kevin Jones"), null, 1010)
 	};
 
-	static class TestEntry {
-		protected final Integer id;
-		protected final String title;
-		protected final String author;
-		protected final Double price;
-		protected final Integer qty;
+	private static final String EBOOKSHOP_SCHEMA_NAME = "ebookshop";
+	public static final H2DbMetadata H2_EBOOKSHOP_DB = new H2DbMetadata(EBOOKSHOP_SCHEMA_NAME);
+	public static final DerbyDbMetadata DERBY_EBOOKSHOP_DB = new DerbyDbMetadata(EBOOKSHOP_SCHEMA_NAME);
+
+	/**
+	 * TestEntry.
+	 */
+	public static class TestEntry implements Serializable {
+		public final Integer id;
+		public final String title;
+		public final String author;
+		public final Double price;
+		public final Integer qty;
 
 		private TestEntry(Integer id, String title, String author, Double price, Integer qty) {
 			this.id = id;
@@ -80,25 +82,34 @@ public class JDBCTestBase {
 			this.price = price;
 			this.qty = qty;
 		}
+
+		@Override
+		public String toString() {
+			return "TestEntry{" +
+					"id=" + id +
+					", title='" + title + '\'' +
+					", author='" + author + '\'' +
+					", price=" + price +
+					", qty=" + qty +
+					'}';
+		}
 	}
 
-	public static final RowTypeInfo ROW_TYPE_INFO = new RowTypeInfo(
+	static final RowTypeInfo ROW_TYPE_INFO = new RowTypeInfo(
 		BasicTypeInfo.INT_TYPE_INFO,
 		BasicTypeInfo.STRING_TYPE_INFO,
 		BasicTypeInfo.STRING_TYPE_INFO,
 		BasicTypeInfo.DOUBLE_TYPE_INFO,
 		BasicTypeInfo.INT_TYPE_INFO);
 
-	public static String getCreateQuery(String tableName) {
-		StringBuilder sqlQueryBuilder = new StringBuilder("CREATE TABLE ");
-		sqlQueryBuilder.append(tableName).append(" (");
-		sqlQueryBuilder.append("id INT NOT NULL DEFAULT 0,");
-		sqlQueryBuilder.append("title VARCHAR(50) DEFAULT NULL,");
-		sqlQueryBuilder.append("author VARCHAR(50) DEFAULT NULL,");
-		sqlQueryBuilder.append("price FLOAT DEFAULT NULL,");
-		sqlQueryBuilder.append("qty INT DEFAULT NULL,");
-		sqlQueryBuilder.append("PRIMARY KEY (id))");
-		return sqlQueryBuilder.toString();
+	private static String getCreateQuery(String tableName) {
+		return "CREATE TABLE " + tableName + " (" +
+				"id INT NOT NULL DEFAULT 0," +
+				"title VARCHAR(50) DEFAULT NULL," +
+				"author VARCHAR(50) DEFAULT NULL," +
+				"price FLOAT DEFAULT NULL," +
+				"qty INT DEFAULT NULL," +
+				"PRIMARY KEY (id))";
 	}
 
 	public static String getInsertQuery() {
@@ -114,25 +125,28 @@ public class JDBCTestBase {
 				sqlQueryBuilder.append(",");
 			}
 		}
-		String insertQuery = sqlQueryBuilder.toString();
-		return insertQuery;
+		return sqlQueryBuilder.toString();
 	}
 
+	@SuppressWarnings("unused") // used in string constant in prepareDatabase
 	public static final OutputStream DEV_NULL = new OutputStream() {
 		@Override
 		public void write(int b) {
 		}
 	};
 
-	@BeforeClass
-	public static void prepareDerbyDatabase() throws Exception {
-		System.setProperty("derby.stream.error.field", JDBCTestBase.class.getCanonicalName() + ".DEV_NULL");
-
-		Class.forName(DRIVER_CLASS);
-		try (Connection conn = DriverManager.getConnection(DB_URL + ";create=true")) {
-			createTable(conn, JDBCTestBase.INPUT_TABLE);
+	public static void initSchema(DbMetadata dbMetadata) throws ClassNotFoundException, SQLException {
+		System.setProperty("derby.stream.error.field", JdbcTestFixture.class.getCanonicalName() + ".DEV_NULL");
+		Class.forName(dbMetadata.getDriverClass());
+		try (Connection conn = DriverManager.getConnection(dbMetadata.getInitUrl())) {
+			createTable(conn, JdbcTestFixture.INPUT_TABLE);
 			createTable(conn, OUTPUT_TABLE);
 			createTable(conn, OUTPUT_TABLE_2);
+		}
+	}
+
+	static void initData(DbMetadata dbMetadata) throws SQLException {
+		try (Connection conn = DriverManager.getConnection(dbMetadata.getUrl())) {
 			insertDataIntoInputTable(conn);
 		}
 	}
@@ -149,16 +163,24 @@ public class JDBCTestBase {
 		stat.close();
 	}
 
-	@AfterClass
-	public static void cleanUpDerbyDatabases() throws Exception {
-		Class.forName(DRIVER_CLASS);
+	public static void cleanUpDatabasesStatic(DbMetadata dbMetadata) throws ClassNotFoundException, SQLException {
+		Class.forName(dbMetadata.getDriverClass());
 		try (
-			Connection conn = DriverManager.getConnection(DB_URL + ";create=true");
-			Statement stat = conn.createStatement()) {
+				Connection conn = DriverManager.getConnection(dbMetadata.getUrl());
+				Statement stat = conn.createStatement()) {
 
 			stat.executeUpdate("DROP TABLE " + INPUT_TABLE);
 			stat.executeUpdate("DROP TABLE " + OUTPUT_TABLE);
 			stat.executeUpdate("DROP TABLE " + OUTPUT_TABLE_2);
 		}
 	}
+
+	static void cleanupData(String url) throws Exception {
+		try (Connection conn = DriverManager.getConnection(url)) {
+			try (Statement st = conn.createStatement()) {
+				st.executeUpdate("delete from " + INPUT_TABLE);
+			}
+		}
+	}
+
 }
